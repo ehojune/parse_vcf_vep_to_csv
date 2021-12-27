@@ -120,15 +120,69 @@ def extract_info_from_InterVarOutput(variant_list, InterVartxt_path):
 
 
 
+def update_info_with_vcf(variant_list, vcf_path, Sample_name):
+    with open(vcf_path, 'r') as fr2:
+        
+        line = fr2.readline()
+        while line:
+            if not line.startswith('#CHROM'):
+                line = fr2.readline()
+            else:   break
+
+        assert Sample_name in line, f"{line} doesn't have {Sample_name}."
+        sample_idx = line.split().index(Sample_name)
+
+        prev_tempVariant_POS = ''
+        idx = 0
+
+        while True:
+
+            tempVariant = variant_list[idx]
+            if tempVariant.POS != prev_tempVariant_POS:
+                
+                line = fr2.readline()[:-1].split('\t')
+                POS = line[1]
+                print("BBB2", POS, tempVariant.POS)
+                #print(POS, tempVariant.POS)
+            if len(line) < 2:   break
+            print("CCC", POS, tempVariant.POS)
+            if int(tempVariant.POS) - int(POS) == 1:
+                tempVariant.POS = POS
+                tempVariant.REF = line[3]
+                tempVariant.ALT = line[4]
+                #print(POS, tempVariant.POS)
+                print("DDD", POS, tempVariant.POS)
+
+            print("ZZZ", POS, tempVariant.POS) 
+            while POS != tempVariant.POS:
+                line = fr2.readline()[:-1].split('\t')
+                POS = line[1]
+
+                #print("AAA", POS, tempVariant.POS)
+
+            print("BBB", POS, tempVariant.POS)              
+            #if  POS != tempVariant.POS: print(POS, tempVariant.POS)
+            assert POS == tempVariant.POS
+
+            formatline = line[8].split(':')
+            infoline = line[sample_idx].split(':')
+            tempVariant.VQSR = line[6]
+            if 'GT' in formatline:
+                tempVariant.GT = infoline[formatline.index('GT')].replace('|', '/')
+            if 'GQ' in formatline:
+               tempVariant.GQ = infoline[formatline.index('GQ')]
+            if 'DP' in formatline:
+                tempVariant.DP = infoline[formatline.index('DP')]
+            if 'AD' in  formatline:
+                tempVariant.AD = infoline[formatline.index('AD')]
+
+            variant_list[idx].replace_variable(tempVariant)
+
+            idx += 1
+            prev_tempVariant_POS = POS
 
 
-
-
-
-
-
-
-def update_info_with_vcf(variant_list, jointcall_vcf_path, Sample_name):
+def update_info_with_jointcalledvcf(variant_list, jointcall_vcf_path, Sample_name):
     with open(jointcall_vcf_path, 'r') as fr2:
         
         line = fr2.readline()
@@ -136,6 +190,7 @@ def update_info_with_vcf(variant_list, jointcall_vcf_path, Sample_name):
             if not line.startswith('#CHROM'):
                 line = fr2.readline()
             else:   break
+            
         assert Sample_name in line, f"{line} doesn't have {Sample_name}."
         sample_idx = line.split().index(Sample_name)
 
@@ -151,55 +206,27 @@ def update_info_with_vcf(variant_list, jointcall_vcf_path, Sample_name):
 
             if len(line) < 2:   break
 
-            """
-            ## this line is because of mismatches due to InterVar changes Variant's position
-            if tempVariant.POS in ["114124", "116288", "134528", "134605"]:
-                idx += 1
-                tempVariant = variant_list[idx]
-            """
-            print(int(tempVariant.POS))
-            print(POS)
-            print(int(tempVariant.POS) - int(POS))
-            if int(tempVariant.POS) - int(POS) == 1:
-                tempVariant.POS = POS
-                tempVariant.REF = line[3]
-                tempVariant.ALT = line[4]
-                print(POS, tempVariant.POS)
 
-            """
             while (POS != tempVariant.POS):
-
-                if line
-
                 line = fr2.readline()[:-1].split('\t')
                 if len(line) < 2 and POS != tempVariant.POS: return 0
                 POS = line[1]
                 print(POS, tempVariant.POS)
-            """
+
             assert POS == tempVariant.POS
 
 
             formatline = line[8].split(':')
             infoline = line[sample_idx].split(':')
-            tempVariant.VQSR = line[6]
-            if 'GT' in formatline:
-                tempVariant.GT = infoline[formatline.index('GT')].replace('|', '/')
-            if 'GQ' in formatline:
-               tempVariant.GQ = infoline[formatline.index('GQ')]
-            if 'DP' in formatline:
-                tempVariant.DP = infoline[formatline.index('DP')]
-            if 'AD' in  formatline:
-                tempVariant.AD = infoline[formatline.index('AD')]
 
             tempVariant.assign_AlleleBalance()
             tempVariant.assign_denovo(line, formatline)
             variant_list[idx].replace_variable(tempVariant)
 
-
             idx += 1
             prev_tempVariant_POS = POS
 
-            
+
 
 def write_variant_to_tsv(variant_list, output_tsv_path):
     with open(output_tsv_path, 'w') as fw:
@@ -212,7 +239,9 @@ def write_variant_to_tsv(variant_list, output_tsv_path):
 def main():
     extract_info_from_InterVarOutput(variant_list, InterVartxt_path)
     update_info_with_vcf(variant_list, vcf_path, Sample_name)
+    update_info_with_jointcalledvcf(variant_list, jointcall_vcf_path, Sample_name)
     write_variant_to_tsv(variant_list, output_tsv_path)
+
 
 if __name__ == '__main__':
     main()
